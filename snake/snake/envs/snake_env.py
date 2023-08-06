@@ -17,13 +17,12 @@ GREEN = pygame.Color(0, 255, 0)
 BLUE = pygame.Color(0, 0, 255)
 
 
-
-
 class SnakeEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self):
         self.action_space = spaces.Discrete(4)
+        self.observation_space = spaces.Discrete(4) # Not use observation space(Handling Error) # We observate images
         self.frame_size_x = 200
         self.frame_size_y = 200
         self.game_window = pygame.display.set_mode((self.frame_size_x, self.frame_size_y))
