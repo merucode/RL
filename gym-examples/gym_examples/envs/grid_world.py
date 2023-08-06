@@ -99,8 +99,8 @@ class GridWorldEnv(gym.Env):
 
 
     def render(self):
-            if self.render_mode == "rgb_array":
-                return self._render_frame()
+        if self.render_mode == "rgb_array":
+            return self._render_frame()
 
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
