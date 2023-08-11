@@ -63,11 +63,11 @@ class TraderWorldEnv(gym.Env):
 
         self.window_size_x = 900        # The size of the PyGame window
         self.window_size_y = 1500
-        self.candle_frame_size_x = 900  # The size of the candle frame
+        self.candle_frame_size_x = self.window_size_x # The size of the candle frame
         self.candle_frame_size_y = 900
-        self.volume_frame_size_x = 900  # The volume of the candle frame
+        self.volume_frame_size_x = self.window_size_x  # The volume of the candle frame
         self.volume_frame_size_y = 500
-        self.score_frame_size_x = 900   # The score of the candle frame
+        self.score_frame_size_x = self.window_size_x   # The score of the candle frame
         self.score_frame_size_y = 100
 
         # Observations are ohlcv data with obeservation lenth
@@ -96,8 +96,9 @@ class TraderWorldEnv(gym.Env):
             # Buy close price. After action value tiem step, sell low price(conservative profit)
             buy_price = self.lst_ohlcv[self.time_step + self.obs_len - 1][3]
             sell_price = self.lst_ohlcv[self.time_step + self.obs_len - 1 + action][2]
-            # trading_fee = buy_price*(0.015_증권사수수료)*0.01 + sell_price*(0.015_증권사수수료+0.3_세금)*0.01
-            trading_fee = buy_price*0.015*0.01 + sell_price*(0.015+0.3)*0.01
+            # STOCK: trading_fee = -1 * buy_price*(0.015_증권사수수료)*0.01 + sell_price*(0.015_증권사수수료+0.3_세금)*0.01
+            # Crypto: trading_fee = -1 * buy_price*(0.05_업비트수수료)*0.01 + sell_price*(0.05_업비트수수료)*0.01
+            trading_fee = buy_price*(0.05)*0.01 + sell_price*(0.05)*0.01
             trading_fee = round(trading_fee)
 
             # profit = -1 * buy_close_price + sell_low_price - trade_fee 
@@ -117,7 +118,7 @@ class TraderWorldEnv(gym.Env):
     def reset(self, seed=None, options=None):
         self.time_step = 0
 
-        self.balance = 100000
+        self.balance = 1000
 
         observation = self._get_obs()
         #info = self._get_info()
@@ -200,8 +201,8 @@ class TraderWorldEnv(gym.Env):
         candle_frame = pygame.Surface((self.candle_frame_size_x, self.candle_frame_size_y))
         candle_frame.fill(BLACK)
         candle_width = self.candle_frame_size_x // self.obs_len
-        candle_line_space = (candle_width // 2) - 1
-        candle_line_width = 2
+        candle_line_space = candle_width // 2 
+        candle_line_width = 1
 
         observation_render = self._get_obs_render()
         scale_ohlc_lst_render = self._get_scale_ohlc_lst_render(observation_render, new_range=self.candle_frame_size_y)
