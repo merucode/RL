@@ -71,7 +71,7 @@ class TraderWorldEnv(gym.Env):
         self.score_frame_size_y = 100
 
         # Observations are ohlcv data with obeservation lenth
-        self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len, 5), dtype=int)
+        self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len, 5), dtype=float)
 
         # We have 10 actions(each action is differe)
         self.action_space = spaces.Discrete(actions)
