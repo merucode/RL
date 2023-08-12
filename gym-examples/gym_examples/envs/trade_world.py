@@ -59,7 +59,7 @@ class TradeWorldEnv(gym.Env):
         self.time_step_limit = len(self.df) - self.obs_len - trade_action
 
         # Observations are ohlcv data with obeservation lenth
-        self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len, 5), dtype=float)
+        self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len*5,), dtype=float)
         # Action Space
         self.action_space = spaces.Discrete(trade_action)
 
@@ -111,7 +111,7 @@ class TradeWorldEnv(gym.Env):
 
     def _get_obs(self):
         obs_lst = self.lst_ohlcv[self.time_step:self.time_step + self.obs_len]
-        return np.array(obs_lst, dtype=np.float32)
+        return np.array(obs_lst, dtype=np.float32).flatten()
 
     def _get_obs_render(self):
         return self.lst_ohlcv_render[self.time_step:self.time_step + self.obs_len]
@@ -131,7 +131,7 @@ class TradeWorldEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, info
+        return observation, {}
 
 
     def step(self, action):
@@ -141,13 +141,13 @@ class TradeWorldEnv(gym.Env):
 
         observation = self._get_obs()
         reward = profit
-        terminated = True if (self.balance <= 0 or self.time_step==self.time_step_limit) else False
+        terminated = True if (self.balance <= 0 or self.time_step >= self.time_step_limit) else False
         info = self._get_info()
 
         if self.render_mode == "human":
             self._render_frame()
 
-        self.time_step += 1
+        self.time_step = self.time_step + 1 + action
         return observation, reward, terminated, False, info
 
 
