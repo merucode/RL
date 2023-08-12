@@ -127,7 +127,7 @@ class TradeWorldEnv(gym.Env):
 
         observation = self._get_obs()
         reward = profit
-        terminated = False
+        terminated = True if (self.balance <= 0 or self.time_step==self.time_step_limit) else False
         info = self._get_info()
 
         if self.render_mode == "human":
