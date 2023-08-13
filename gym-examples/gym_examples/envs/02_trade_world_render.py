@@ -1,7 +1,11 @@
+import numpy as np
+from typing import Optional, Union
+import pygame
+
 import gym
 from gym import spaces
-import pygame
-import numpy as np
+from gym.utils.renderer import Renderer
+from gym.error import DependencyNotInstalled
 
 BLACK = pygame.Color(0, 0, 0)
 WHITE = pygame.Color(255, 255, 255)
@@ -50,16 +54,16 @@ YELLOW = pygame.Color(255, 255, 0)
 """
 
 class TradeWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array", 'single_rgb_array'], "render_fps": 8}
 
     def __init__(self, df, df_render=None, obs_len=30, trade_action=12, render_mode=None):
         self.df = df
         self.lst_ohlcv = self.df_to_lst(self.df)  # convert DataFrame to list
         self.obs_len = obs_len
-        self.time_step_limit = len(self.df) - self.obs_len - trade_action
+        self.time_step_limit = len(self.df) - self.obs_len - trade_action - 100 # -100 is test conservation : After need to fix
 
         # Observations are ohlcv data with obeservation lenth
-        self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len, 5), dtype=float)
+        self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len*5,), dtype=float)
         # Action Space
         self.action_space = spaces.Discrete(trade_action)
 
@@ -80,6 +84,7 @@ class TradeWorldEnv(gym.Env):
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
+        self.renderer = Renderer(self.render_mode, self._render)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -111,7 +116,7 @@ class TradeWorldEnv(gym.Env):
 
     def _get_obs(self):
         obs_lst = self.lst_ohlcv[self.time_step:self.time_step + self.obs_len]
-        return np.array(obs_lst, dtype=np.float32)
+        return np.array(obs_lst, dtype=np.float32).flatten()
 
     def _get_obs_render(self):
         return self.lst_ohlcv_render[self.time_step:self.time_step + self.obs_len]
@@ -120,8 +125,13 @@ class TradeWorldEnv(gym.Env):
         return {"balance": self.balance}
     
     
-
-    def reset(self, options=None):
+    def reset(
+        self,
+        *,
+        seed: Optional[int] = None,
+        return_info: bool = False,
+        options: Optional[dict] = None,
+    ):
         self.time_step = 0
         self.balance = 1000
 
@@ -129,9 +139,15 @@ class TradeWorldEnv(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self._render()
 
-        return observation, info
+        self.renderer.reset()
+        self.renderer.render_step()
+
+        if not return_info:
+            return observation
+        else:
+            return observation, {}
 
 
     def step(self, action):
@@ -141,29 +157,46 @@ class TradeWorldEnv(gym.Env):
 
         observation = self._get_obs()
         reward = profit
-        terminated = True if (self.balance <= 0 or self.time_step==self.time_step_limit) else False
+        terminated = True if (self.balance <= 0 or self.time_step >= self.time_step_limit) else False
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self._render()
 
-        self.time_step += 1
+        self.time_step = self.time_step + 1 + action
+        self.renderer.render_step()
+
         return observation, reward, terminated, False, info
 
 
     ########################## RENDER ##########################
-    def render(self):
-        if self.render_mode == "rgb_array":
-            pygame.font.init()  # For display score
-            return self._render_frame()
+    def render(self, mode="human"):
+        if self.render_mode is not None:
+            return self.renderer.get_renders()
+        else:
+            return self._render(mode)
 
-    def _render_frame(self):
-        if self.window is None and self.render_mode == "human":
+    def _render(self, mode="human"):
+        assert mode in self.metadata["render_modes"]
+        try:
+            import pygame
+            from pygame import gfxdraw
+        except ImportError:
+            raise DependencyNotInstalled(
+                "pygame is not installed, run `pip install gym[classic_control]`"
+            )
+
+        if self.window is None:
             pygame.init()
-            pygame.display.init()
-            self.window = pygame.display.set_mode((self.window_size_x, self.window_size_y))
-        if self.clock is None and self.render_mode == "human":
-            self.clock = pygame.time.Clock()            
+            if mode == "human":
+                pygame.display.init()
+                self.window = pygame.display.set_mode(
+                    (self.window_size_x, self.window_size_y)
+                )
+            else:  # mode in {"rgb_array", "single_rgb_array"}
+                self.window = pygame.Surface((self.window_size_x, self.window_size_y))
+        if self.clock is None:
+            self.clock = pygame.time.Clock()     
 
         canvas = pygame.Surface((self.window_size_x, self.window_size_y))
         canvas.fill(WHITE)
@@ -193,7 +226,8 @@ class TradeWorldEnv(gym.Env):
             # We need to ensure that human-rendering occurs at the predefined framerate.
             # The following line will automatically add a delay to keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
-        else:  # rgb_array
+            
+        elif mode in {"rgb_array", "single_rgb_array"}:
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
