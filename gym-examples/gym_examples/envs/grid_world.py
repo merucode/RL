@@ -87,7 +87,7 @@ class GridWorldEnv(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self._render()
 
         self.renderer.reset()
         self.renderer.render_step()
@@ -112,7 +112,7 @@ class GridWorldEnv(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self._render()
 
         self.time_step += 1
         self.renderer.render_step()
