@@ -30,13 +30,14 @@ YELLOW = pygame.Color(255, 255, 0)
 
     ### Action Space
     The action space is a `Discrete(actions)`
-    | Num | Action                                                            |
-    | --- | ----------------------------------------------------------------- |
-    | 0   | Hold                                                              |
-    | 1   | Buy coin and sell coin after 1 step                               |
-    | 2   | Buy coin and sell coin after 2 step                               |
+    | Num  | Action                                                            |
+    | ---- | ----------------------------------------------------------------- |
+    |  0   | Hold                                                              |
+    |  1   | Buy coin and sell coin after 1 step                               |
+    |  2   | Buy coin and sell coin after 2 step                               |
     ...
-    | n   | Buy coin and sell coin after n step                               |
+    |  12   | Buy coin and sell coin after 12 step                             |
+    | 13~15 | Hold                                                             |
 
 
     ### Observation Space
@@ -54,24 +55,25 @@ YELLOW = pygame.Color(255, 255, 0)
 """
 
 class TradeWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array", 'single_rgb_array'], "render_fps": 8}
+    metadata = {"render_modes": ["human", "rgb_array", 'single_rgb_array'], "render_fps": 30}
 
-    def __init__(self, df, df_render=None, obs_len=30, trade_action=12, render_mode=None):
+    def __init__(self, df, df_render=None, obs_len=2016, trade_action=16, render_mode=None):
         self.df = df
         self.lst_ohlcv = self.df_to_lst(self.df)  # convert DataFrame to list
         self.obs_len = obs_len
-        self.time_step_limit = len(self.df) - self.obs_len - trade_action - 100 # -100 is test conservation : After need to fix
+        self.time_step_limit = len(self.df) - self.obs_len - trade_action # 0 is test conservation : After need to fix
+        self.trade_action = trade_action
 
         # Observations are ohlcv data with obeservation lenth
         self.observation_space = spaces.Box(0, np.Inf, shape=(self.obs_len*5,), dtype=float)
         # Action Space
-        self.action_space = spaces.Discrete(trade_action)
+        self.action_space = spaces.Discrete(self.trade_action)
 
         # Render
         self.df_render = df_render if df_render is not None else df
         self.lst_ohlcv_render = self.df_to_lst(self.df_render)
 
-        self.window_size_x = 900                      # The size of the PyGame window
+        self.window_size_x = 2016                      # The size of the PyGame window
         self.window_size_y = 1500
         self.candle_frame_size_x = self.window_size_x # The size of the candle frame
         self.candle_frame_size_y = 900
@@ -79,7 +81,6 @@ class TradeWorldEnv(gym.Env):
         self.volume_frame_size_y = 500
         self.score_frame_size_x = self.window_size_x  # The score of the candle frame
         self.score_frame_size_y = 100
-
 
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -98,12 +99,13 @@ class TradeWorldEnv(gym.Env):
 
 
     def _action_to_trade(self, action):
-        if action == 0:
+        if action == 0 or action >= 13:
             profit = 0
-        else:
+        else:   # Trade action is activate with 1~12 values 
             # Buy close price. After action value tiem step, sell low price(conservative profit)
-            buy_price = self.lst_ohlcv[self.time_step + self.obs_len - 1][3]
-            sell_price = self.lst_ohlcv[self.time_step + self.obs_len - 1 + action][2]
+            # Use lst_ohcv_render to get original price(lst_ohlc is nomalized)
+            buy_price = self.lst_ohlcv_render[self.time_step + self.obs_len - 1][3]
+            sell_price = self.lst_ohlcv_render[self.time_step + self.obs_len - 1 + action][2]
             # STOCK: trading_fee = -1 * buy_price*(0.015_증권사수수료)*0.01 + sell_price*(0.015_증권사수수료+0.3_세금)*0.01
             # Crypto: trading_fee = -1 * buy_price*(0.05_업비트수수료)*0.01 + sell_price*(0.05_업비트수수료)*0.01
             trading_fee = buy_price*(0.05)*0.01 + sell_price*(0.05)*0.01
@@ -116,13 +118,15 @@ class TradeWorldEnv(gym.Env):
 
     def _get_obs(self):
         obs_lst = self.lst_ohlcv[self.time_step:self.time_step + self.obs_len]
-        return np.array(obs_lst, dtype=np.float32).flatten()
+        arr = np.array(obs_lst, dtype=np.float32)
+        arr = self.arr_ohlcv_norm_nomalized(arr)
+        return arr.flatten()
 
     def _get_obs_render(self):
         return self.lst_ohlcv_render[self.time_step:self.time_step + self.obs_len]
 
     def _get_info(self):
-        return {"balance": self.balance}
+        return {"balance": self.balance, 'time_step': self.time_step, 'time_step_limit':self.time_step_limit}
     
     
     def reset(
@@ -333,3 +337,10 @@ class TradeWorldEnv(gym.Env):
         scaled_value = (value - old_min) / (old_max - old_min) * new_range
         scaled_value = round(scaled_value)
         return scaled_value
+
+    def arr_ohlcv_norm_nomalized(self, arr):
+        arr_ohlc, arr_v = np.hsplit(arr, [4])
+        arr_ohlc_normalized = arr_ohlc/np.linalg.norm(arr_ohlc)
+        arr_v_normalized = arr_v/np.linalg.norm(arr_v)
+        arr = np.concatenate((arr_ohlc_normalized, arr_v_normalized), axis=1)
+        return arr
