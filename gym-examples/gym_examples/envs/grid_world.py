@@ -2,10 +2,15 @@ import gym
 from gym import spaces
 import pygame
 import numpy as np
+from typing import Optional, Union
+
+
+from gym.utils.renderer import Renderer
+from gym.error import DependencyNotInstalled
 
 
 class GridWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array", 'single_rgb_array'], "render_fps": 4}
 
     def __init__(self, render_mode=None, size=5):
         self.size = size  # The size of the square grid
@@ -37,6 +42,7 @@ class GridWorldEnv(gym.Env):
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
+        self.renderer = Renderer(self.render_mode, self._render)
 
         """
         If human-rendering is used, `self.window` will be a reference
@@ -56,7 +62,13 @@ class GridWorldEnv(gym.Env):
         return {"distance": np.linalg.norm(self._agent_location - self._target_location, ord=1)}
 
         
-    def reset(self, seed=None, options=None):
+    def reset(
+        self,
+        *,
+        seed: Optional[int] = None,
+        return_info: bool = False,
+        options: Optional[dict] = None,
+    ):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
         self.time_step = 0
@@ -77,7 +89,12 @@ class GridWorldEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, info
+        self.renderer.reset()
+        self.renderer.render_step()
+        if not return_info:
+            return observation
+        else:
+            return observation, {}
 
 
     def step(self, action):
@@ -98,19 +115,37 @@ class GridWorldEnv(gym.Env):
             self._render_frame()
 
         self.time_step += 1
+        self.renderer.render_step()
+
         return observation, reward, terminated, False, info
 
 
-    def render(self):
-        if self.render_mode == "rgb_array":
-            return self._render_frame()
+    def render(self, mode="human"):
+        if self.render_mode is not None:
+            return self.renderer.get_renders()
+        else:
+            return self._render(mode)
 
-    def _render_frame(self):
-        if self.window is None and self.render_mode == "human":
+    def _render(self, mode="human"):
+        assert mode in self.metadata["render_modes"]
+        try:
+            import pygame
+            from pygame import gfxdraw
+        except ImportError:
+            raise DependencyNotInstalled(
+                "pygame is not installed, run `pip install gym[classic_control]`"
+            )
+
+        if self.window is None:
             pygame.init()
-            pygame.display.init()
-            self.window = pygame.display.set_mode((self.window_size, self.window_size))
-        if self.clock is None and self.render_mode == "human":
+            if mode == "human":
+                pygame.display.init()
+                self.window = pygame.display.set_mode(
+                    (self.window_size, self.window_size)
+                )
+            else:  # mode in {"rgb_array", "single_rgb_array"}
+                self.window = pygame.Surface((self.window_size, self.window_size))
+        if self.clock is None:
             self.clock = pygame.time.Clock()
 
         canvas = pygame.Surface((self.window_size, self.window_size))
@@ -162,7 +197,8 @@ class GridWorldEnv(gym.Env):
             # We need to ensure that human-rendering occurs at the predefined framerate.
             # The following line will automatically add a delay to keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
-        else:  # rgb_array
+            
+        elif mode in {"rgb_array", "single_rgb_array"}:
             return np.transpose(
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
