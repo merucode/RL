@@ -102,10 +102,10 @@ class TradeWorldEnv(gym.Env):
         if action == 0 or action >= 13:
             profit = 0
         else:   # Trade action is activate with 1~12 values 
-            # Buy close price. After action value tiem step, sell low price(conservative profit)
+            # Buy close price. After action value tiem step, sell close price
             # Use lst_ohcv_render to get original price(lst_ohlc is nomalized)
             buy_price = self.lst_ohlcv_render[self.time_step + self.obs_len - 1][3]
-            sell_price = self.lst_ohlcv_render[self.time_step + self.obs_len - 1 + action][2]
+            sell_price = self.lst_ohlcv_render[self.time_step + self.obs_len - 1 + action][3]
             # STOCK: trading_fee = -1 * buy_price*(0.015_증권사수수료)*0.01 + sell_price*(0.015_증권사수수료+0.3_세금)*0.01
             # Crypto: trading_fee = -1 * buy_price*(0.05_업비트수수료)*0.01 + sell_price*(0.05_업비트수수료)*0.01
             trading_fee = buy_price*(0.05)*0.01 + sell_price*(0.05)*0.01
@@ -155,7 +155,7 @@ class TradeWorldEnv(gym.Env):
         if not return_info:
             return observation
         else:
-            return observation, {}
+            return observation, info
 
 
     def step(self, action):
@@ -180,8 +180,10 @@ class TradeWorldEnv(gym.Env):
     ########################## RENDER ##########################
     def render(self, mode="human"):
         if self.render_mode is not None:
+            pygame.font.init()  # For display score
             return self.renderer.get_renders()
         else:
+            pygame.font.init()  # For display score
             return self._render(mode)
 
     def _render(self, mode="human"):
