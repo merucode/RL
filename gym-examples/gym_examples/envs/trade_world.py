@@ -61,7 +61,7 @@ class TradeWorldEnv(gym.Env):
         self.df = df
         self.lst_ohlcv = self.df_to_lst(self.df)  # convert DataFrame to list
         self.obs_len = obs_len
-        self.time_step_limit = len(self.df) - self.obs_len - trade_action # 0 is test conservation : After need to fix
+        self.time_step_limit = len(self.df) - self.obs_len - trade_action 
         self.trade_action = trade_action
 
         # Observations are ohlcv data with obeservation lenth
@@ -126,7 +126,11 @@ class TradeWorldEnv(gym.Env):
         return self.lst_ohlcv_render[self.time_step:self.time_step + self.obs_len]
 
     def _get_info(self):
-        return {"balance": self.balance, 'time_step': self.time_step, 'time_step_limit':self.time_step_limit}
+        return {
+            "balance": self.balance,
+            #"time_step": self.time_step, 
+            #"time_step_limit":self.time_step_limit,
+        }
     
     
     def reset(
