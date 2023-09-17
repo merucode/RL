@@ -163,7 +163,7 @@ class TradeWorldEnv(gym.Env):
 
     def step(self, action):
         profit = self._action_to_trade(action)
-        self.time_step = self.time_step + 1 + action
+        self.time_step = self.time_step + 1 + 12*action
 
         self.balance = self.balance + profit
 
